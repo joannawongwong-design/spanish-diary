@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>西语朗读练习 · Leer en Español</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #F7F4EF; --surface: #FFFFFF; --surface2: #F0EDE7;
+    --green: #1D9E75; --green-light: #E1F5EE; --green-dark: #0F6E56;
+    --amber: #FAC775; --amber-dark: #412402;
+    --blue: #3B82F6; --blue-light: #EFF6FF;
+    --text: #1E1C19; --text2: #5F5E5A; --text3: #9A9890;
+    --border: rgba(0,0,0,0.08); --radius: 14px; --radius-sm: 8px;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+  header { background: var(--green); color: #fff; padding: 18px 24px 16px; display: flex; align-items: baseline; gap: 12px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 12px rgba(0,0,0,0.12); }
+  header h1 { font-family: 'Lora', serif; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  header span { font-size: 13px; opacity: 0.75; font-style: italic; font-family: 'Lora', serif; }
+  .tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 16px; overflow-x: auto; }
+  .tab { padding: 12px 14px; font-size: 14px; font-weight: 500; color: var(--text3); cursor: pointer; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s; user-select: none; white-space: nowrap; }
+  .tab.active { color: var(--green); border-bottom-color: var(--green); }
+  main { flex: 1; padding: 20px 16px; max-width: 680px; margin: 0 auto; width: 100%; }
+  .page { display: none; } .page.active { display: block; }
+  .card { background: var(--surface); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; border: 1px solid var(--border); }
+  .label { font-size: 11px; font-weight: 500; letter-spacing: .08em; color: var(--text3); text-transform: uppercase; margin-bottom: 10px; }
+  textarea { width: 100%; min-height: 140px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; font-size: 15px; line-height: 1.7; color: var(--text); font-family: 'Lora', serif; resize: vertical; outline: none; transition: border-color .15s; }
+  textarea:focus { border-color: var(--green); }
+  textarea::placeholder { color: var(--text3); font-style: italic; }
+  .btn-row { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  button { display: inline-flex; align-items: center; gap: 6px; padding: 9px 20px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; cursor: pointer; border: none; transition: all .15s; font-family: 'Inter', sans-serif; }
+  button:active { transform: scale(.97); }
+  .btn-primary { background: var(--green); color: #fff; }
+  .btn-primary:hover { background: var(--green-dark); }
+  .btn-primary:disabled { background: #9FE1CB; cursor: default; transform: none; }
+  .btn-ghost { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: #e5e2db; }
+  .btn-ghost:disabled { opacity: .4; cursor: default; transform: none; }
+  .btn-icon { padding: 9px 16px; }
+
+  /* Upload */
+  .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 36px 20px; text-align: center; cursor: pointer; transition: all .15s; background: var(--surface2); position: relative; }
+  .upload-zone:hover, .upload-zone.drag-over { border-color: var(--green); background: var(--green-light); }
+  .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { font-size: 36px; display: block; margin-bottom: 10px; }
+  .upload-title { font-size: 15px; font-weight: 500; color: var(--text2); }
+  .upload-sub { font-size: 12px; color: var(--text3); margin-top: 5px; }
+  .img-preview { display: none; margin-top: 14px; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border); position: relative; }
+  .img-preview.show { display: block; }
+  .img-preview img { width: 100%; max-height: 220px; object-fit: contain; background: #f8f8f8; display: block; }
+  .img-clear { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,.5); color: #fff; border: none; border-radius: 50%; width: 26px; height: 26px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .ocr-progress { display: none; align-items: center; gap: 12px; padding: 14px; background: var(--blue-light); border-radius: var(--radius-sm); border: 1px solid #BFDBFE; margin-top: 14px; }
+  .ocr-progress.show { display: flex; }
+  .spinner { width: 20px; height: 20px; border: 2.5px solid #BFDBFE; border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .ocr-msg { font-size: 13px; color: #1E40AF; flex: 1; }
+  .ocr-pct { font-size: 13px; font-weight: 600; color: #1E40AF; min-width: 36px; text-align: right; }
+
+  /* Word display */
+  #word-display { font-family: 'Lora', serif; font-size: 19px; line-height: 2; color: var(--text); min-height: 72px; word-spacing: 2px; }
+  .w { display: inline; padding: 2px 3px; border-radius: 5px; cursor: pointer; transition: background .08s; }
+  .w:hover { background: var(--green-light); }
+  .w.active { background: var(--amber); color: var(--amber-dark); }
+
+  /* Controls */
+  .ctrl-btns { display: flex; gap: 10px; margin-bottom: 16px; }
+  .ctrl-btns button { flex: 1; justify-content: center; }
+  .slider-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .slider-row label { font-size: 13px; color: var(--text2); min-width: 28px; }
+  .slider-row input[type=range] { flex: 1; height: 4px; -webkit-appearance: none; appearance: none; background: var(--surface2); border-radius: 4px; outline: none; border: 1px solid var(--border); }
+  .slider-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--green); cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  .slider-row .val { font-size: 13px; font-weight: 500; min-width: 36px; text-align: right; }
+  .voice-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+  .voice-row label { font-size: 13px; color: var(--text2); white-space: nowrap; }
+  select { flex: 1; padding: 7px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); font-size: 13px; color: var(--text); font-family: 'Inter', sans-serif; outline: none; }
+  select:focus { border-color: var(--green); }
+  #status { font-size: 13px; color: var(--text3); margin-top: 10px; min-height: 18px; }
+
+  /* Tip */
+  .tip { background: #FEF9EE; border: 1px solid #FAC775; border-radius: var(--radius-sm); padding: 12px 14px; font-size: 13px; color: #6B4E0A; line-height: 1.5; display: flex; align-items: flex-start; gap: 8px; }
+  .tip-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+  .tip-close { margin-left: auto; flex-shrink: 0; background: none; border: none; font-size: 16px; color: #9A8060; cursor: pointer; padding: 0 4px; line-height: 1; }
+
+  /* Diary */
+  .diary-empty { text-align: center; padding: 60px 20px; color: var(--text3); }
+  .diary-empty .big { font-size: 48px; display: block; margin-bottom: 12px; }
+  .diary-empty p { font-size: 14px; line-height: 1.6; }
+  .diary-item { background: var(--surface); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 12px; border: 1px solid var(--border); transition: border-color .15s; }
+  .diary-item:hover { border-color: var(--green); }
+  .diary-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .diary-date { font-size: 12px; color: var(--green); font-weight: 500; }
+  .diary-del { font-size: 13px; color: var(--text3); cursor: pointer; background: none; border: none; padding: 2px 6px; }
+  .diary-del:hover { color: #c0392b; }
+  .diary-preview { font-family: 'Lora', serif; font-size: 15px; color: var(--text2); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .diary-actions { margin-top: 10px; display: flex; gap: 8px; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 200; padding: 20px; align-items: flex-end; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border-radius: 20px 20px 0 0; padding: 28px 22px 40px; width: 100%; max-width: 640px; max-height: 80vh; display: flex; flex-direction: column; position: relative; }
+  .modal-close { position: absolute; top: 16px; right: 18px; background: var(--surface2); border: none; border-radius: 50%; width: 30px; height: 30px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text2); }
+  .modal-date { font-size: 12px; color: var(--green); font-weight: 500; margin-bottom: 14px; }
+  .modal-body { font-family: 'Lora', serif; font-size: 16px; line-height: 1.8; color: var(--text); overflow-y: auto; flex: 1; margin-bottom: 20px; }
+
+  @media (max-width: 480px) {
+    header h1 { font-size: 17px; }
+    #word-display { font-size: 17px; }
+    .ctrl-btns button { padding: 9px 10px; font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>西语朗读练习</h1>
+  <span>Leer en Español</span>
+</header>
+
+<nav class="tabs">
+  <div class="tab active" data-tab="read">朗读</div>
+  <div class="tab" data-tab="upload">上传识别</div>
+  <div class="tab" data-tab="diary">日记本</div>
+  <div class="tab" data-tab="about">说明</div>
+</nav>
+
+<main>
+
+  <!-- 朗读页 -->
+  <div class="page active" id="page-read">
+    <div class="card" id="tip-card">
+      <div class="tip">
+        <span class="tip-icon">💡</span>
+        <span>点击任意单词可从该词开始朗读，方便反复练习发音困难的部分。</span>
+        <button class="tip-close" onclick="document.getElementById('tip-card').style.display='none'">×</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="label">输入或粘贴西语文本</div>
+      <textarea id="input-text" placeholder="粘贴 AI 修改后的西语日记…
+
+Ejemplo: Hoy fue un día muy especial para mí. Fui al mercado con mi familia y compramos frutas y verduras frescas."></textarea>
+      <div class="btn-row">
+        <button class="btn-primary" id="btn-load">载入文本 →</button>
+        <button class="btn-ghost" id="btn-save">存入日记本</button>
+      </div>
+    </div>
+    <div class="card" id="display-card" style="display:none;">
+      <div class="label">朗读区域 <span style="font-weight:400;text-transform:none;font-size:11px;">（点击任意词从该处开始）</span></div>
+      <div id="word-display"></div>
+    </div>
+    <div class="card" id="ctrl-card" style="display:none;">
+      <div class="ctrl-btns">
+        <button class="btn-primary btn-icon" id="btn-play">▶ 播放</button>
+        <button class="btn-ghost btn-icon" id="btn-pause" disabled>⏸ 暂停</button>
+        <button class="btn-ghost btn-icon" id="btn-stop" disabled>⏹ 停止</button>
+      </div>
+      <div class="slider-row">
+        <label>语速</label>
+        <input type="range" id="rate" min="50" max="150" step="5" value="85">
+        <span class="val" id="rate-val">0.85x</span>
+      </div>
+      <div class="slider-row">
+        <label>音调</label>
+        <input type="range" id="pitch" min="50" max="200" step="10" value="100">
+        <span class="val" id="pitch-val">1.0</span>
+      </div>
+      <div class="voice-row">
+        <label>声音</label>
+        <select id="voice-select"></select>
+      </div>
+      <div id="status"></div>
+    </div>
+  </div>
+
+  <!-- 上传识别页 -->
+  <div class="page" id="page-upload">
+    <div class="card">
+      <div class="label">上传图片 / PDF / 文本文件</div>
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="file-input" accept="image/*,.pdf,.txt,.md">
+        <span class="upload-icon">📎</span>
+        <div class="upload-title">点击或拖拽文件到此处</div>
+        <div class="upload-sub">图片（JPG / PNG / WEBP）· PDF · TXT · MD</div>
+      </div>
+      <div class="img-preview" id="img-preview">
+        <img id="preview-img" src="" alt="预览">
+        <button class="img-clear" id="img-clear">×</button>
+      </div>
+      <div class="ocr-progress" id="ocr-progress">
+        <div class="spinner"></div>
+        <span class="ocr-msg" id="ocr-msg">正在识别…</span>
+        <span class="ocr-pct" id="ocr-pct"></span>
+      </div>
+    </div>
+
+    <div class="card" id="ocr-result-card" style="display:none;">
+      <div class="label">识别结果 <span style="font-weight:400;text-transform:none;font-size:11px;">— 可在此编辑后再朗读</span></div>
+      <textarea id="ocr-text" style="min-height:200px;"></textarea>
+      <div class="btn-row">
+        <button class="btn-primary" id="btn-ocr-read">▶ 直接朗读</button>
+        <button class="btn-ghost" id="btn-ocr-copy">复制到朗读页</button>
+        <button class="btn-ghost" id="btn-ocr-save">存入日记本</button>
+      </div>
+    </div>
+
+    <div class="card" style="background:var(--surface2);">
+      <div class="label">格式说明</div>
+      <p style="font-size:13px;color:var(--text2);line-height:1.8;">
+        <b>图片</b> — Tesseract OCR 识别，支持西语、中文、英文混排，首次加载需下载语言包（约 10–20 秒）。<br>
+        <b>PDF</b> — 提取文字层，适合导出的日记 PDF。扫描版 PDF 请截图后用图片上传。<br>
+        <b>TXT / MD</b> — 即时读取。<br>
+        <span style="color:var(--text3);">所有处理均在本地完成，文件不会上传到任何服务器。</span>
+      </p>
+    </div>
+  </div>
+
+  <!-- 日记本页 -->
+  <div class="page" id="page-diary">
+    <div id="diary-list"></div>
+  </div>
+
+  <!-- 说明页 -->
+  <div class="page" id="page-about">
+    <div class="card">
+      <div class="label">使用流程</div>
+      <ol style="font-size:14px;line-height:2.1;color:var(--text2);padding-left:18px;margin-top:8px;">
+        <li>将 AI 修改好的西语日记粘贴到「朗读」页，或在「上传识别」页上传图片 / PDF</li>
+        <li>点击「载入文本 →」，文字展开显示</li>
+        <li>点击「▶ 播放」，跟着朗读纠正发音</li>
+        <li>点击<b>任意单词</b>，从该词重复练习</li>
+        <li>存入「日记本」随时复习</li>
+      </ol>
+    </div>
+    <div class="card">
+      <div class="label">关于西语声音</div>
+      <p style="font-size:14px;line-height:1.8;color:var(--text2);">
+        <b>Mac / iPhone：</b> Mónica（西班牙）、Paulina（墨西哥），发音质量好，在「声音」下拉里选择即可。<br><br>
+        <b>Windows：</b> 系统设置 → 语言 → 添加西班牙语语音包，重启浏览器后可选。<br><br>
+        <b>Android：</b> 设置 → 无障碍 → 文字转语音，下载西班牙语语音包。
+      </p>
+    </div>
+    <div class="card">
+      <div class="label">数据与隐私</div>
+      <p style="font-size:14px;line-height:1.8;color:var(--text2);">日记保存在浏览器本地，OCR 识别在本地完成，任何数据均不上传到服务器。清除浏览器数据会同时清除日记，建议定期复制备份。</p>
+    </div>
+  </div>
+
+</main>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <button class="modal-close" id="modal-close">×</button>
+    <div class="modal-date" id="modal-date"></div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="btn-row">
+      <button class="btn-primary" id="modal-read">▶ 朗读此篇</button>
+      <button class="btn-ghost" id="modal-close2">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// PDF.js worker
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+// TTS state
+const synth = window.speechSynthesis;
+let voices = [], spanEls = [], wordStrings = [], wordBoundaries = [];
+let currentIdx = -1, isPlaying = false, isPaused = false, currentText = '', utterance = null;
+
+const inputEl     = document.getElementById('input-text');
+const wordDisplay = document.getElementById('word-display');
+const displayCard = document.getElementById('display-card');
+const ctrlCard    = document.getElementById('ctrl-card');
+const btnLoad     = document.getElementById('btn-load');
+const btnSave     = document.getElementById('btn-save');
+const btnPlay     = document.getElementById('btn-play');
+const btnPause    = document.getElementById('btn-pause');
+const btnStop     = document.getElementById('btn-stop');
+const rateEl      = document.getElementById('rate');
+const pitchEl     = document.getElementById('pitch');
+const rateValEl   = document.getElementById('rate-val');
+const pitchValEl  = document.getElementById('pitch-val');
+const voiceSel    = document.getElementById('voice-select');
+const statusEl    = document.getElementById('status');
+
+rateEl.addEventListener('input',  () => rateValEl.textContent  = (rateEl.value/100).toFixed(2)+'x');
+pitchEl.addEventListener('input', () => pitchValEl.textContent = (pitchEl.value/100).toFixed(1));
+
+function loadVoices() {
+  const all = synth.getVoices();
+  const es  = all.filter(v => v.lang.startsWith('es'));
+  voices = es.length ? es : all;
+  voiceSel.innerHTML = '';
+  if (!voices.length) { voiceSel.innerHTML = '<option>未检测到语音包</option>'; return; }
+  voices.forEach((v, i) => {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = v.name + ' (' + v.lang + ')';
+    voiceSel.appendChild(o);
+  });
+}
+if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = loadVoices;
+loadVoices(); setTimeout(loadVoices, 600);
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('page-' + tab.dataset.tab).classList.add('active');
+    if (tab.dataset.tab === 'diary') renderDiary();
+  });
+});
+
+btnLoad.addEventListener('click', () => {
+  const text = inputEl.value.trim(); if (!text) return;
+  currentText = text; stopAll(); tokenize(text);
+  displayCard.style.display = 'block'; ctrlCard.style.display = 'block';
+  statusEl.textContent = '已载入 ' + wordStrings.length + ' 个词，点击任意词可从该处开始朗读。';
+});
+
+function tokenize(text) {
+  wordDisplay.innerHTML = ''; spanEls = []; wordStrings = []; wordBoundaries = [];
+  const re = /(\S+|\s+)/g; let m, wIdx = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (/\S/.test(m[0])) {
+      const sp = document.createElement('span');
+      sp.className = 'w'; sp.textContent = m[0]; sp.dataset.i = wIdx;
+      const idx = wIdx;
+      sp.addEventListener('click', () => seekTo(idx));
+      wordDisplay.appendChild(sp); spanEls.push(sp); wordStrings.push(m[0]); wordBoundaries.push(m.index); wIdx++;
+    } else { wordDisplay.appendChild(document.createTextNode(m[0])); }
+  }
+}
+
+function highlight(idx) {
+  spanEls.forEach(s => s.classList.remove('active'));
+  if (idx >= 0 && idx < spanEls.length) { spanEls[idx].classList.add('active'); spanEls[idx].scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+  currentIdx = idx;
+}
+function clearHighlight() { spanEls.forEach(s => s.classList.remove('active')); currentIdx = -1; }
+
+function speak(fromWordIdx) {
+  synth.cancel();
+  const startChar = fromWordIdx > 0 ? wordBoundaries[fromWordIdx] : 0;
+  const text = currentText.slice(startChar);
+  utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate  = rateEl.value / 100;
+  utterance.pitch = pitchEl.value / 100;
+  const v = voices[voiceSel.value];
+  if (v) { utterance.voice = v; utterance.lang = v.lang; } else utterance.lang = 'es-ES';
+  utterance.addEventListener('boundary', e => {
+    if (e.name !== 'word') return;
+    const charPos = e.charIndex + startChar;
+    let best = fromWordIdx;
+    for (let i = fromWordIdx; i < wordBoundaries.length; i++) { if (wordBoundaries[i] <= charPos) best = i; else break; }
+    highlight(best);
+  });
+  utterance.addEventListener('end', () => {
+    clearHighlight(); isPlaying = false; isPaused = false;
+    btnPlay.textContent = '▶ 播放'; btnPause.disabled = true; btnStop.disabled = true;
+    statusEl.textContent = '朗读完毕 ✓';
+  });
+  utterance.addEventListener('error', e => { statusEl.textContent = '语音出错：' + e.error; isPlaying = false; });
+  synth.speak(utterance);
+  isPlaying = true; isPaused = false;
+  btnPlay.textContent = '▶ 播放中'; btnPause.disabled = false; btnStop.disabled = false;
+  statusEl.textContent = '朗读中…';
+}
+
+function seekTo(idx) { stopAll(); speak(idx); }
+function stopAll() {
+  synth.cancel(); clearHighlight(); isPlaying = false; isPaused = false;
+  btnPlay.textContent = '▶ 播放'; btnPause.disabled = true; btnStop.disabled = true;
+}
+
+btnPlay.addEventListener('click', () => {
+  if (!currentText) return;
+  if (isPaused) { synth.resume(); isPaused = false; isPlaying = true; btnPlay.textContent = '▶ 播放中'; btnPause.disabled = false; statusEl.textContent = '朗读中…'; return; }
+  if (isPlaying) return;
+  speak(currentIdx >= 0 ? currentIdx : 0);
+});
+btnPause.addEventListener('click', () => {
+  if (!isPlaying || isPaused) return;
+  synth.pause(); isPaused = true; isPlaying = false; btnPlay.textContent = '▶ 继续'; statusEl.textContent = '已暂停';
+});
+btnStop.addEventListener('click', () => { stopAll(); statusEl.textContent = '已停止'; });
+
+// ── Upload & OCR ──
+const fileInput    = document.getElementById('file-input');
+const uploadZone   = document.getElementById('upload-zone');
+const imgPreview   = document.getElementById('img-preview');
+const previewImg   = document.getElementById('preview-img');
+const imgClear     = document.getElementById('img-clear');
+const ocrProgress  = document.getElementById('ocr-progress');
+const ocrMsg       = document.getElementById('ocr-msg');
+const ocrPct       = document.getElementById('ocr-pct');
+const ocrResultCard= document.getElementById('ocr-result-card');
+const ocrText      = document.getElementById('ocr-text');
+
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('drag-over'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+imgClear.addEventListener('click', () => { imgPreview.classList.remove('show'); ocrResultCard.style.display = 'none'; fileInput.value = ''; });
+
+async function handleFile(file) {
+  const type = file.type, name = file.name.toLowerCase();
+  ocrResultCard.style.display = 'none'; ocrProgress.classList.remove('show'); imgPreview.classList.remove('show');
+  if (type.startsWith('image/')) {
+    previewImg.src = URL.createObjectURL(file); imgPreview.classList.add('show');
+    await runOCR(file);
+  } else if (type === 'application/pdf' || name.endsWith('.pdf')) {
+    await extractPDF(file);
+  } else if (type.startsWith('text/') || name.endsWith('.txt') || name.endsWith('.md')) {
+    await readTextFile(file);
+  } else {
+    alert('不支持的格式，请上传图片、PDF 或文本文件。');
+  }
+}
+
+async function runOCR(file) {
+  ocrProgress.classList.add('show'); ocrMsg.textContent = '正在加载 OCR 引擎…（首次约 15 秒）'; ocrPct.textContent = '';
+  try {
+    const worker = await Tesseract.createWorker(['spa', 'chi_sim', 'eng'], 1, {
+      logger: m => {
+        if (m.status === 'recognizing text') { ocrMsg.textContent = '正在识别文字…'; ocrPct.textContent = Math.round(m.progress * 100) + '%'; }
+        else { ocrMsg.textContent = m.status; ocrPct.textContent = ''; }
+      }
+    });
+    const { data: { text } } = await worker.recognize(file);
+    await worker.terminate();
+    ocrProgress.classList.remove('show');
+    showOcrResult(text.trim());
+  } catch (err) {
+    ocrProgress.classList.remove('show'); alert('OCR 识别失败：' + err.message); console.error(err);
+  }
+}
+
+async function extractPDF(file) {
+  ocrProgress.classList.add('show'); ocrMsg.textContent = '正在读取 PDF…'; ocrPct.textContent = '';
+  try {
+    const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    let fullText = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      ocrMsg.textContent = `提取第 ${i} / ${pdf.numPages} 页…`; ocrPct.textContent = Math.round((i/pdf.numPages)*100) + '%';
+      const content = await (await pdf.getPage(i)).getTextContent();
+      fullText += content.items.map(x => x.str).join(' ') + '\n\n';
+    }
+    ocrProgress.classList.remove('show'); showOcrResult(fullText.trim());
+  } catch (err) {
+    ocrProgress.classList.remove('show'); alert('PDF 读取失败：' + err.message + '\n\n提示：扫描版 PDF 请截图后用图片上传。'); console.error(err);
+  }
+}
+
+async function readTextFile(file) {
+  ocrProgress.classList.add('show'); ocrMsg.textContent = '读取中…'; ocrPct.textContent = '';
+  try { const text = await file.text(); ocrProgress.classList.remove('show'); showOcrResult(text.trim()); }
+  catch (err) { ocrProgress.classList.remove('show'); alert('读取失败：' + err.message); }
+}
+
+function showOcrResult(text) {
+  ocrText.value = text; ocrResultCard.style.display = 'block';
+  ocrResultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+document.getElementById('btn-ocr-read').addEventListener('click', () => {
+  const text = ocrText.value.trim(); if (!text) return;
+  inputEl.value = text; switchToRead(text);
+});
+document.getElementById('btn-ocr-copy').addEventListener('click', () => {
+  const text = ocrText.value.trim(); if (!text) return;
+  inputEl.value = text;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelector('[data-tab=read]').classList.add('active');
+  document.getElementById('page-read').classList.add('active');
+});
+document.getElementById('btn-ocr-save').addEventListener('click', () => {
+  const text = ocrText.value.trim(); if (!text) return;
+  saveDiaryEntry(text);
+  const btn = document.getElementById('btn-ocr-save');
+  btn.textContent = '✓ 已保存'; setTimeout(() => btn.textContent = '存入日记本', 2000);
+});
+
+// ── Diary ──
+function getDiaries() { try { return JSON.parse(localStorage.getItem('es_diaries') || '[]'); } catch { return []; } }
+function saveDiaries(arr) { localStorage.setItem('es_diaries', JSON.stringify(arr)); }
+function saveDiaryEntry(text) {
+  const diaries = getDiaries();
+  diaries.unshift({ id: Date.now(), date: new Date().toLocaleDateString('zh-CN', { year:'numeric', month:'long', day:'numeric' }), preview: text.slice(0,80)+(text.length>80?'…':''), content: text });
+  saveDiaries(diaries);
+}
+
+btnSave.addEventListener('click', () => {
+  const text = inputEl.value.trim(); if (!text) return;
+  saveDiaryEntry(text); statusEl.textContent = '已存入日记本 ✓'; setTimeout(() => statusEl.textContent = '', 2000);
+});
+
+function renderDiary() {
+  const list = document.getElementById('diary-list');
+  const diaries = getDiaries();
+  if (!diaries.length) { list.innerHTML = '<div class="diary-empty"><span class="big">📓</span><p>还没有保存的日记<br>在朗读页或上传识别页保存日记</p></div>'; return; }
+  list.innerHTML = diaries.map(d => `
+    <div class="diary-item">
+      <div class="diary-meta"><span class="diary-date">${d.date}</span><button class="diary-del" data-id="${d.id}">删除</button></div>
+      <div class="diary-preview">${d.preview}</div>
+      <div class="diary-actions">
+        <button class="btn-primary btn-icon" style="font-size:13px;padding:6px 14px;" data-action="read" data-id="${d.id}">▶ 朗读</button>
+        <button class="btn-ghost btn-icon" style="font-size:13px;padding:6px 14px;" data-action="view" data-id="${d.id}">查看全文</button>
+      </div>
+    </div>
+  `).join('');
+  list.querySelectorAll('[data-action=read]').forEach(btn => btn.addEventListener('click', () => { const d = getDiaries().find(x => x.id == btn.dataset.id); if (d) switchToRead(d.content); }));
+  list.querySelectorAll('[data-action=view]').forEach(btn => btn.addEventListener('click', () => { const d = getDiaries().find(x => x.id == btn.dataset.id); if (d) openModal(d); }));
+  list.querySelectorAll('.diary-del').forEach(btn => btn.addEventListener('click', () => { if (!confirm('确认删除？')) return; saveDiaries(getDiaries().filter(x => x.id != btn.dataset.id)); renderDiary(); }));
+}
+
+function switchToRead(content) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelector('[data-tab=read]').classList.add('active');
+  document.getElementById('page-read').classList.add('active');
+  inputEl.value = content; currentText = content; stopAll(); tokenize(content);
+  displayCard.style.display = 'block'; ctrlCard.style.display = 'block';
+  statusEl.textContent = '已载入 ' + wordStrings.length + ' 个词，点击播放开始朗读。';
+}
+
+// Modal
+const modal = document.getElementById('modal');
+const modalDate = document.getElementById('modal-date');
+const modalBody = document.getElementById('modal-body');
+let modalEntry = null;
+function openModal(d) { modalEntry = d; modalDate.textContent = d.date; modalBody.textContent = d.content; modal.classList.add('open'); }
+document.getElementById('modal-close').addEventListener('click',  () => modal.classList.remove('open'));
+document.getElementById('modal-close2').addEventListener('click', () => modal.classList.remove('open'));
+modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+document.getElementById('modal-read').addEventListener('click', () => { if (!modalEntry) return; modal.classList.remove('open'); switchToRead(modalEntry.content); });
+</script>
+</body>
+</html>
